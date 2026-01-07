@@ -1,3 +1,4 @@
+const serverless = require("serverless-http");
 const express = require("express");
 const cors = require("cors");
 const admin = require("firebase-admin");
@@ -8,20 +9,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ---------- Firebase (ENV se) ----------
-const serviceAccount = JSON.parse(
-  process.env.FIREBASE_SERVICE_ACCOUNT
-);
-
+// Firebase
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 }
-
 const db = admin.firestore();
 
-// ---------- Nodemailer ----------
+// Nodemailer
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -30,29 +25,21 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ---------- Helpers ----------
-const generateOtp = () =>
-  Math.floor(100000 + Math.random() * 900000).toString();
+// OTP helper
+const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-// ---------- Routes ----------
+// Routes
 app.post("/send-otp", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.json({ success: false });
 
-  const snap = await db
-    .collection("users")
-    .where("email", "==", email.toLowerCase())
-    .get();
-
+  const snap = await db.collection("users").where("email", "==", email.toLowerCase()).get();
   if (snap.empty) return res.json({ success: false });
 
   const otp = generateOtp();
-
   await db.collection("otps").doc(email).set({
     otp,
-    expiresAt: admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + 5 * 60 * 1000)
-    ),
+    expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5*60*1000)),
   });
 
   await transporter.sendMail({
@@ -67,14 +54,11 @@ app.post("/send-otp", async (req, res) => {
 
 app.post("/verify-otp", async (req, res) => {
   const { email, otp } = req.body;
-
   const ref = db.collection("otps").doc(email);
   const doc = await ref.get();
-
   if (!doc.exists) return res.json({ success: false });
 
-  const data = doc.data();
-  if (data.otp !== otp) return res.json({ success: false });
+  if (doc.data().otp !== otp) return res.json({ success: false });
 
   await ref.delete();
   res.json({ success: true });
@@ -82,12 +66,7 @@ app.post("/verify-otp", async (req, res) => {
 
 app.post("/reset-password", async (req, res) => {
   const { email, password } = req.body;
-
-  const snap = await db
-    .collection("users")
-    .where("email", "==", email.toLowerCase())
-    .get();
-
+  const snap = await db.collection("users").where("email", "==", email.toLowerCase()).get();
   if (snap.empty) return res.json({ success: false });
 
   const hashed = bcrypt.hashSync(password, 10);
@@ -96,4 +75,5 @@ app.post("/reset-password", async (req, res) => {
   res.json({ success: true });
 });
 
-module.exports = app;
+// Export for Vercel
+module.exports = serverless(app);
