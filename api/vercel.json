@@ -1,8 +1,6 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/api/send-otp", "dest": "/api/send-otp.js" },
-    { "src": "/api/verify-otp", "dest": "/api/verify-otp.js" },
-    { "src": "/api/reset-password", "dest": "/api/reset-password.js" }
-  ]
+  "functions": {
+    "api/*.js": { "runtime": "nodejs18.x" }
+  }
 }
